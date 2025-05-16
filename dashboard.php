@@ -99,6 +99,7 @@ try {
                                     <a href="cancel_reservation.php?id=<?php echo $reservation['ID']; ?>" class="bg-red-500 text-white px-2 py-1 rounded" onclick="return confirm('Are you sure you want to cancel this reservation?');">Cancel</a>
                                 <?php elseif ($reservation['Status'] === 'checked_out'): ?>
                                     <a href="return_reservation.php?id=<?php echo $reservation['ID']; ?>" class="bg-blue-500 text-white px-2 py-1 rounded mr-1">Return</a>
+                                    
                                 <?php endif; ?>
                             </td>
                         </tr>

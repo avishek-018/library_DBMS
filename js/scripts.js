@@ -31,8 +31,8 @@ async function reserveBook(bookId) {
             alert('Failed to reserve book: ' + result.error);
             console.error('Reservation error:', result.error);
         } else {
-            document.getElementById(`reserve-btn-${bookId}`).outerHTML = '<span class="text-yellow-500 font-bold">Reservation pending</span>';
             alert('Reservation pending!');
+            window.location.reload(); // Refresh to update availability and reservations
         }
     } catch (error) {
         alert('Reservation error: ' + error.message);

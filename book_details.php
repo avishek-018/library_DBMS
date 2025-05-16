@@ -13,6 +13,7 @@ if ($book_id <= 0) {
     exit;
 }
 
+// Fetch book details
 $stmt = $pdo->prepare('
     SELECT b.ID, b.Title, b.ISBN, b.PublicationYear,
            GROUP_CONCAT(a.Name) AS Authors,
@@ -28,20 +29,26 @@ $stmt = $pdo->prepare('
 $stmt->execute([$book_id]);
 $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$stmt = $pdo->prepare('SELECT IsAvailable FROM BookCopy WHERE Book_ID = ? AND CopyNumber = 1');
-$stmt->execute([$book_id]);
-$copy = $stmt->fetch(PDO::FETCH_ASSOC);
-$is_available = $copy ? $copy['IsAvailable'] : false;
+if (!$book) {
+    header('Location: books.php?error=Book+not+found');
+    exit;
+}
 
+// Count available copies
+$stmt = $pdo->prepare('SELECT COUNT(*) AS available_copies FROM BookCopy WHERE Book_ID = ? AND IsAvailable = TRUE');
+$stmt->execute([$book_id]);
+$available_copies = $stmt->fetchColumn();
+
+// Count user's pending reservations for this book
 $stmt = $pdo->prepare('
-    SELECT r.ID
+    SELECT COUNT(*) AS pending_count
     FROM Reservation r
     JOIN ReservationBookCopy rbc ON r.ID = rbc.Reservation_ID
     JOIN ReservationMember rm ON r.ID = rm.Reservation_ID
-    WHERE rbc.Book_ID = ? AND rm.Member_ID = ? AND r.Status = ?
+    WHERE rbc.Book_ID = ? AND rm.Member_ID = ? AND r.Status = "pending"
 ');
-$stmt->execute([$book_id, $_SESSION['user']['ID'], 'pending']);
-$has_pending = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->execute([$book_id, $_SESSION['user']['ID']]);
+$pending_count = $stmt->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -53,28 +60,21 @@ $has_pending = $stmt->fetch(PDO::FETCH_ASSOC);
     <script src="js/scripts.js"></script>
 </head>
 <body class="bg-gray-100">
-    <nav class="bg-blue-600 text-white p-4">
-        <div class="container mx-auto flex justify-between">
-            <span class="text-xl font-bold">Library</span>
-            <div>
-                <span><?php echo htmlspecialchars($_SESSION['user']['Name']) . ' (' . $_SESSION['user']['Role'] . ')'; ?></span>
-                <a href="reservations.php" class="ml-4">My Reservations</a>
-                <a href="profile.php" class="ml-4">Profile</a>
-                <a href="logout.php" class="ml-4 bg-red-500 px-3 py-1 rounded">Logout</a>
-            </div>
-        </div>
-    </nav>
+    <?php include 'navbar_member.php'; ?>
     <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold mb-4"><?php echo htmlspecialchars($book['Title']); ?></h1>
         <p><strong>Author(s):</strong> <?php echo htmlspecialchars($book['Authors']); ?></p>
         <p><strong>Genre(s):</strong> <?php echo htmlspecialchars($book['Genres']); ?></p>
         <p><strong>ISBN:</strong> <?php echo htmlspecialchars($book['ISBN']); ?></p>
         <p><strong>Publication Year:</strong> <?php echo htmlspecialchars($book['PublicationYear']); ?></p>
-        <p><strong>Availability:</strong> <?php echo $is_available ? 'Available' : 'Not Available'; ?></p>
-        <?php if ($_SESSION['user']['Role'] === 'member' && $is_available && !$has_pending): ?>
+        <p><strong>Available Copies:</strong> <?php echo $available_copies; ?></p>
+        <?php if ($pending_count > 0): ?>
+            <p><strong>Your Reservations:</strong> You have <?php echo $pending_count; ?> pending reservation<?php echo $pending_count > 1 ? 's' : ''; ?> for this book.</p>
+        <?php endif; ?>
+        <?php if ($_SESSION['user']['Role'] === 'member' && $available_copies > 0): ?>
             <button id="reserve-btn-<?php echo $book['ID']; ?>" onclick="reserveBook(<?php echo $book['ID']; ?>)" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Reserve</button>
-        <?php elseif ($has_pending): ?>
-            <span class="text-yellow-500 font-bold">Reservation pending</span>
+        <?php else: ?>
+            <span class="text-red-500 font-bold">No copies available</span>
         <?php endif; ?>
     </div>
 </body>

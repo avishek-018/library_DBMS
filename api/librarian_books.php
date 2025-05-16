@@ -30,7 +30,7 @@ try {
     $countStmt->execute($countParams);
     $totalBooks = $countStmt->fetchColumn();
 
-    // Fetch books with available copies
+    // Fetch books with total and available copies
     $query = '
         SELECT b.ID, b.Title, b.ISBN, b.PublicationYear,
                GROUP_CONCAT(DISTINCT a.Name SEPARATOR ", ") as Authors,
@@ -40,7 +40,12 @@ try {
                    FROM BookCopy bc
                    WHERE bc.Book_ID = b.ID
                    AND bc.IsAvailable = 1
-               ) as AvailableCopies
+               ) as AvailableCopies,
+               (
+                   SELECT COUNT(*)
+                   FROM BookCopy bc
+                   WHERE bc.Book_ID = b.ID
+               ) as TotalCopies
         FROM Book b
         LEFT JOIN WrittenBy wb ON b.ID = wb.Book_ID
         LEFT JOIN Author a ON wb.Author_ID = a.ID
@@ -55,7 +60,6 @@ try {
         $params[] = "%$search%";
     }
     $query .= ' GROUP BY b.ID, b.Title, b.ISBN, b.PublicationYear';
-    $query .= ' HAVING AvailableCopies > 0';
     $query .= ' LIMIT ' . $limit . ' OFFSET ' . $offset;
 
     $stmt = $pdo->prepare($query);

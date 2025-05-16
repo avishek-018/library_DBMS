@@ -1,37 +1,33 @@
 <?php
-session_start();
 header('Content-Type: application/json');
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
 require '../config.php';
 
-if (!isset($_SESSION['user']) || $_SESSION['user']['Role'] !== 'librarian') {
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
+ini_set('log_errors', 1);
+ini_set('error_log', '/tmp/php_errors.log');
 
-$bookId = (int)($_GET['id'] ?? 0);
-
-if ($bookId <= 0) {
-    echo json_encode(['error' => 'Invalid book ID']);
-    exit;
-}
-
-$pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare('DELETE FROM WrittenBy WHERE Book_ID = ?');
-    $stmt->execute([$bookId]);
-    $stmt = $pdo->prepare('DELETE FROM BookGenre WHERE Book_ID = ?');
-    $stmt->execute([$bookId]);
-    $stmt = $pdo->prepare('DELETE FROM Reservation WHERE Book_ID = ?');
-    $stmt->execute([$bookId]);
-    $stmt = $pdo->prepare('DELETE FROM BookCopy WHERE Book_ID = ?');
-    $stmt->execute([$bookId]);
-    $stmt = $pdo->prepare('DELETE FROM Book WHERE ID = ?');
-    $stmt->execute([$bookId]);
+    if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
+        throw new Exception('Invalid request method');
+    }
 
-    $pdo->commit();
-    echo json_encode(['message' => 'Book deleted successfully']);
+    $book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    if ($book_id <= 0) {
+        throw new Exception('Invalid book ID');
+    }
+
+    $stmt = $pdo->prepare('DELETE FROM Book WHERE ID = ?');
+    $stmt->execute([$book_id]);
+
+    if ($stmt->rowCount() === 0) {
+        throw new Exception('Book not found');
+    }
+
+    echo json_encode(['success' => 'Book deleted successfully']);
 } catch (Exception $e) {
-    $pdo->rollBack();
-    echo json_encode(['error' => 'Failed to delete book']);
+    error_log('API Error: ' . $e->getMessage());
+    echo json_encode(['error' => 'Failed to delete book: ' . $e->getMessage()]);
 }
 ?>
